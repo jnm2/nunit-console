@@ -129,7 +129,7 @@ namespace NUnit.Engine.Extensibility
         /// <summary>
         /// Gets a newly created extension object, created in the domain specified
         /// </summary>
-        public object CreateExtensionObject(params object[] args)
+        public virtual object CreateExtensionObject(params object[] args)
         {
             return AppDomain.CurrentDomain.CreateInstanceFromAndUnwrap(AssemblyPath, TypeName, false, 0, null, args, null, null, null);
         }
