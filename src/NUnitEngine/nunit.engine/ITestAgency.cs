@@ -34,5 +34,7 @@ namespace NUnit.Engine
         /// </summary>
         /// <param name="agent"></param>
         void Register(ITestAgent agent);
+        
+        ITestAgent GetAgent(TestPackage package, int waitTime);
     }
 }

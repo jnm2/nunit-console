@@ -97,6 +97,10 @@
     <Compile Include="Services\ExtensionServiceTestExtensions.cs" />
     <Compile Include="Services\ExtensionServiceTests.cs" />
     <Compile Include="Services\Fakes\FakeRuntimeService.cs" />
+    <Compile Include="Services\Fakes\StubProject.cs" />
+    <Compile Include="Services\Fakes\StubProjectLoader.cs" />
+    <Compile Include="Services\ProcessModelTests.cs" />
+    <Compile Include="Services\ProcessModelTests.SpyTestAgency.cs" />
     <Compile Include="Services\ServiceManagerTests.cs" />
     <Compile Include="Services\TestAgencyTests.cs" />
     <Compile Include="Services\SettingsServiceTests.cs" />
@@ -152,13 +156,19 @@
       <Link>nunit.snk</Link>
     </None>
     <None Include="App.config" />
-    <Content Include="EngineTests.MultiAssemblySingleProcess.nunit">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="EngineTests.MultiAssemblyDefaultProcess.nunit">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <None Include="packages.config" />
+    <None Include="UniqueFilename4.nunit">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="UniqueFilename3.nunit">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="UniqueFilename2.nunit">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="UniqueFilename1.nunit">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

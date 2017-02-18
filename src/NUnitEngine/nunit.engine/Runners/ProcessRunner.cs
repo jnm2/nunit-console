@@ -39,11 +39,11 @@ namespace NUnit.Engine.Runners
 
         private ITestAgent _agent;
         private ITestEngineRunner _remoteRunner;
-        private TestAgency _agency;
+        private ITestAgency _agency;
 
         public ProcessRunner(IServiceLocator services, TestPackage package) : base(services, package) 
         {
-            _agency = Services.GetService<TestAgency>();
+            _agency = Services.GetService<ITestAgency>();
         }
 
         #region Properties
