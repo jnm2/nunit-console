@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -76,9 +76,9 @@ namespace NUnit.Engine.Services
                             return new SkippedAssemblyFrameworkDriver(assemblyPath);
                 }
 
-                var references = new List<AssemblyName>();
-                foreach (var cecilRef in assemblyDef.MainModule.AssemblyReferences)
-                    references.Add(new AssemblyName(cecilRef.FullName));
+                var assemblyResolver = new DefaultAssemblyResolver();
+                assemblyResolver.AddSearchDirectory(Path.GetDirectoryName(assemblyPath));
+                var references = GetTransitiveReferences(assemblyResolver, assemblyDef.MainModule.AssemblyReferences);
 
                 foreach (var factory in _factories)
                 {
@@ -99,6 +99,25 @@ namespace NUnit.Engine.Services
             else
                 return new InvalidAssemblyFrameworkDriver(assemblyPath, string.Format("No suitable tests found in '{0}'.\n" +
                                                                               "Either assembly contains no tests or proper test driver has not been found.", assemblyPath));
+        }
+
+        private static ICollection<AssemblyName> GetTransitiveReferences(IAssemblyResolver resolver, IEnumerable<AssemblyNameReference> startingReferences)
+        {
+            if (resolver == null) throw new ArgumentNullException(nameof(resolver));
+            if (startingReferences == null) throw new ArgumentNullException(nameof(startingReferences));
+
+            var referencesByCanonicalName = new Dictionary<string, AssemblyName>();
+
+            var allReferences = StackEnumerator.Create(startingReferences);
+            foreach (var reference in allReferences)
+            {
+                var assemblyName = new AssemblyName(reference.FullName);
+                if (referencesByCanonicalName.ContainsKey(assemblyName.FullName)) continue;
+                referencesByCanonicalName.Add(assemblyName.FullName, assemblyName);
+                allReferences.Recurse(resolver.Resolve(reference).MainModule.AssemblyReferences);
+            }
+
+            return referencesByCanonicalName.Values;
         }
 
         #endregion

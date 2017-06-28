@@ -84,6 +84,7 @@
     <Compile Include="Internal\Logging\Logger.cs" />
     <Compile Include="Internal\ServerUtilities.ObservableServerChannelSinkProvider.cs" />
     <Compile Include="Internal\ProvidedPathsAssemblyResolver.cs" />
+    <Compile Include="Internal\StackEnumerator.cs" />
     <Compile Include="ITestAgency.cs" />
     <Compile Include="ITestAgent.cs" />
     <Compile Include="Agents\RemoteTestAgent.cs" />

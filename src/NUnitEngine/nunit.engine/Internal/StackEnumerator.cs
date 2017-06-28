@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 
-namespace NUnit.Engine.Tests.Helpers
+namespace NUnit.Engine.Internal
 {
     public static class StackEnumerator
     {
@@ -49,7 +48,7 @@ namespace NUnit.Engine.Tests.Helpers
 
         public StackEnumerator(IEnumerator<T> initial)
         {
-            current = initial ?? Enumerable.Empty<T>().GetEnumerator();
+            current = initial ?? ((IEnumerable<T>)new T[0]).GetEnumerator();
         }
         public StackEnumerator(IEnumerable<T> initial) : this(initial?.GetEnumerator())
         {
