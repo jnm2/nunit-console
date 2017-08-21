@@ -77,12 +77,10 @@
     <Compile Include="InternalEnginePackageSettings.cs" />
     <Compile Include="Internal\AssemblyHelper.cs" />
     <Compile Include="Internal\CecilExtensions.cs" />
-    <Compile Include="Internal\CurrentMessageCounter.cs" />
     <Compile Include="Internal\DirectoryFinder.cs" />
     <Compile Include="Internal\Logging\InternalTrace.cs" />
     <Compile Include="Internal\Logging\InternalTraceWriter.cs" />
     <Compile Include="Internal\Logging\Logger.cs" />
-    <Compile Include="Internal\TcpChannelUtils.ObservableServerChannelSinkProvider.cs" />
     <Compile Include="Internal\ProvidedPathsAssemblyResolver.cs" />
     <Compile Include="ITestAgency.cs" />
     <Compile Include="ITestAgent.cs" />
@@ -97,8 +95,6 @@
     <Compile Include="Internal\ResultHelper.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="Internal\ServerBase.cs" />
-    <Compile Include="Internal\TcpChannelUtils.cs" />
     <Compile Include="Internal\SettingsGroup.cs" />
     <Compile Include="Internal\SettingsStore.cs" />
     <Compile Include="ITestEngineRunner.cs" />

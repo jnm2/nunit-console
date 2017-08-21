@@ -21,12 +21,9 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ***********************************************************************
 
-using System;
 using System.IO;
 using System.Xml;
-using NUnit.Common;
 using NUnit.Engine;
-using NUnit.ConsoleRunner.Utilities;
 
 namespace NUnit.ConsoleRunner
 {    
@@ -34,7 +31,7 @@ namespace NUnit.ConsoleRunner
     /// TestEventHandler processes events from the running
     /// test for the console runner.
     /// </summary>
-    public class TestEventHandler : MarshalByRefObject, ITestEventListener
+    public class TestEventHandler : ITestEventListener
     {
         private readonly TextWriter _outWriter;
 
@@ -223,15 +220,6 @@ namespace NUnit.ConsoleRunner
                 default:
                     return ColorStyle.Output;
             }
-        }
-
-        #endregion
-
-        #region InitializeLifetimeService
-
-        public override object InitializeLifetimeService()
-        {
-            return null;
         }
 
         #endregion
