@@ -67,7 +67,7 @@ namespace NUnit.Engine.Runners.Tests
             _services.Add(new Services.DomainManager());
             _services.Add(new Services.ProjectService());
             _services.Add(new Services.DefaultTestRunnerFactory());
-            _services.Add(new Services.TestAgency("ProcessRunnerTests", 0));
+            _services.Add(new Agents.AgentPool());
             _services.ServiceManager.StartServices();
 
             var assemblies = new List<string>();

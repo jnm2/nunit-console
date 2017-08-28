@@ -30,31 +30,17 @@ using NUnit.Engine.Services;
 
 namespace NUnit.Agent
 {
-    public class NUnitTestAgent
+    public static class NUnitTestAgent
     {
-        static Logger log = InternalTrace.GetLogger(typeof(NUnitTestAgent));
-
-        static Guid AgentId;
-        static string AgencyUrl;
-        static Process AgencyProcess;
-        static RemoteTestAgent Agent;
-
         private const string LOG_FILE_FORMAT = "nunit-agent_{0}.log";
-
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
-        [STAThread]
+        
         public static int Main(string[] args)
         {
-            AgentId = new Guid(args[0]);
-            AgencyUrl = args[1];
+            var traceLevel = InternalTraceLevel.Off;
 
-            InternalTraceLevel traceLevel = InternalTraceLevel.Off;
-
-            for (int i = 2; i < args.Length; i++)
+            for (var i = 2; i < args.Length; i++)
             {
-                string arg = args[i];
+                var arg = args[i];
 
                 // NOTE: we can test these strings exactly since
                 // they originate from the engine itself.
@@ -67,17 +53,15 @@ namespace NUnit.Agent
                 {
                     traceLevel = (InternalTraceLevel)Enum.Parse(typeof(InternalTraceLevel), arg.Substring(8));
                 }
-                else if (arg.StartsWith("--pid="))
-                {
-                    int agencyProcessId = int.Parse(arg.Substring(6));
-                    AgencyProcess = Process.GetProcessById(agencyProcessId);
-                }
             }
 
             // Initialize trace so we can see what's happening
-            int pid = Process.GetCurrentProcess().Id;
-            string logname = string.Format(LOG_FILE_FORMAT, pid);
+            var pid = Process.GetCurrentProcess().Id;
+            var logname = string.Format(LOG_FILE_FORMAT, pid);
             InternalTrace.Initialize(logname, traceLevel);
+
+
+            var log = InternalTrace.GetLogger(typeof(NUnitTestAgent));
 
             log.Info("Agent process {0} starting", pid);
             log.Info("Running under version {0}, {1}",
@@ -87,27 +71,27 @@ namespace NUnit.Agent
             // Restore the COMPLUS_Version env variable if it's been overridden by TestAgency::LaunchAgentProcess
             try
             {
-              string cpvOriginal = Environment.GetEnvironmentVariable("TestAgency_COMPLUS_Version_Original");
-              if(!string.IsNullOrEmpty(cpvOriginal))
-              {
-                log.Debug("Agent process has the COMPLUS_Version environment variable value \"{0}\" overridden with \"{1}\", restoring the original value.", cpvOriginal, Environment.GetEnvironmentVariable("COMPLUS_Version"));
-                Environment.SetEnvironmentVariable("TestAgency_COMPLUS_Version_Original", null, EnvironmentVariableTarget.Process); // Erase marker
-                Environment.SetEnvironmentVariable("COMPLUS_Version", (cpvOriginal == "NULL" ? null : cpvOriginal), EnvironmentVariableTarget.Process); // Restore original (which might be n/a)
-              }
+                var cpvOriginal = Environment.GetEnvironmentVariable("TestAgency_COMPLUS_Version_Original");
+                if (!string.IsNullOrEmpty(cpvOriginal))
+                {
+                    log.Debug("Agent process has the COMPLUS_Version environment variable value \"{0}\" overridden with \"{1}\", restoring the original value.", cpvOriginal, Environment.GetEnvironmentVariable("COMPLUS_Version"));
+                    Environment.SetEnvironmentVariable("TestAgency_COMPLUS_Version_Original", null, EnvironmentVariableTarget.Process); // Erase marker
+                    Environment.SetEnvironmentVariable("COMPLUS_Version", (cpvOriginal == "NULL" ? null : cpvOriginal), EnvironmentVariableTarget.Process); // Restore original (which might be n/a)
+                }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-              log.Warning("Failed to restore the COMPLUS_Version variable. " + ex.Message); // Proceed with running tests anyway
+                log.Warning("Failed to restore the COMPLUS_Version variable. " + ex.Message); // Proceed with running tests anyway
             }
 
             // Create TestEngine - this program is
-            // conceptually part of  the engine and
-            // can access it's internals as needed.
-            TestEngine engine = new TestEngine();
+            // conceptually part of the engine and
+            // can access its internals as needed.
+            var engine = new TestEngine();
 
             // TODO: We need to get this from somewhere. Argument?
             engine.InternalTraceLevel = InternalTraceLevel.Debug;
-            
+
             // Custom Service Initialization
             //log.Info("Adding Services");
             engine.Services.Add(new SettingsService(false));
@@ -121,40 +105,11 @@ namespace NUnit.Agent
             log.Info("Initializing Services");
             engine.Initialize();
 
-            log.Info("Starting RemoteTestAgent");
-            Agent = new RemoteTestAgent(AgentId, AgencyUrl, engine.Services);
+            throw new NotImplementedException();
 
-            try
-            {
-                if (Agent.Start())
-                    WaitForStop();
-                else
-                    log.Error("Failed to start RemoteTestAgent");
-            }
-            catch (Exception ex)
-            {
-                log.Error("Exception in RemoteTestAgent", ex);
-            }
+            /*log.Info("Agent process {0} exiting", Process.GetCurrentProcess().Id);
 
-            log.Info("Agent process {0} exiting", Process.GetCurrentProcess().Id);
-
-            return 0;
-        }
-
-        private static void WaitForStop()
-        {
-            log.Debug("Waiting for stopSignal");
-
-            while (!Agent.WaitForStop(500))
-            {
-                if (AgencyProcess.HasExited)
-                {
-                    log.Error("Parent process has been terminated.");
-                    Environment.Exit(-1);
-                }
-            }
-
-            log.Debug("Stop signal received");
+            return 0;*/
         }
     }
 }

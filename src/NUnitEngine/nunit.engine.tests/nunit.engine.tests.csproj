@@ -103,12 +103,10 @@
     <Compile Include="Runners\TestEngineRunnerTests.cs" />
     <Compile Include="Runners\ParallelTaskWorkerPoolTests.cs" />
     <Compile Include="RuntimeFrameworkTests.cs" />
-    <Compile Include="Services\AgentDataBaseTests.cs" />
     <Compile Include="Services\ExtensionAssemblyTests.cs" />
     <Compile Include="Services\ExtensionServiceTests.cs" />
     <Compile Include="Services\Fakes\FakeRuntimeService.cs" />
     <Compile Include="Services\ServiceManagerTests.cs" />
-    <Compile Include="Services\TestAgencyTests.cs" />
     <Compile Include="Services\SettingsServiceTests.cs" />
     <Compile Include="Services\RuntimeFrameworkServiceTests.cs" />
     <Compile Include="Services\DomainManagerStaticTests.cs" />

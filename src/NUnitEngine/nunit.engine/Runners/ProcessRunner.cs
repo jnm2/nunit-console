@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -22,118 +22,124 @@
 // ***********************************************************************
 
 using System;
+using NUnit.Engine.Agents;
 using NUnit.Engine.Internal;
-using NUnit.Engine.Services;
 
 namespace NUnit.Engine.Runners
 {
     /// <summary>
-    /// Summary description for ProcessRunner.
+    /// Acquires and releases an agent from the given pool, adapting it
+    /// to the <see cref="AbstractTestRunner"/> contract and handling errors.
     /// </summary>
-    public class ProcessRunner : AbstractTestRunner
+    public sealed class ProcessRunner : AbstractTestRunner
     {
         private const int NORMAL_TIMEOUT = 30000;               // 30 seconds
         private const int DEBUG_TIMEOUT = NORMAL_TIMEOUT * 10;  // 5 minutes
 
         private static readonly Logger log = InternalTrace.GetLogger(typeof(ProcessRunner));
 
-        private ITestAgent _agent;
-        private ITestEngineRunner _remoteRunner;
-        private TestAgency _agency;
+        private readonly IAgentPool _pool;
+        private IAcquiredAgent _agent;
+        private IAgentPackageContext _packageContext;
+        private IAgentRunContext _runContext;
 
-        public ProcessRunner(IServiceLocator services, TestPackage package) : base(services, package) 
+        public ProcessRunner(IServiceLocator services, TestPackage package) : base(services, package)
         {
-            _agency = Services.GetService<TestAgency>();
+            _pool = Services.GetService<IAgentPool>();
+        }
+        
+        private IAcquiredAgent GetAgent()
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(ProcessRunner));
+
+            if (_agent == null)
+            {
+                log.Info($"Acquiring agent for {TestPackage.Name}");
+
+                // Increase the timeout to give time to attach a debugger
+                var debug = TestPackage.GetSetting(EnginePackageSettings.DebugAgent, false) ||
+                             TestPackage.GetSetting(EnginePackageSettings.PauseBeforeRun, false);
+
+                _agent = _pool.AcquireAgent(AgentRequirements.GetRequirements(TestPackage), debug ? DEBUG_TIMEOUT : NORMAL_TIMEOUT);
+            }
+            return _agent;
         }
 
-        #region Properties
+        private AgentPackageLoadResult GetPackageLoadResult()
+        {
+            var agent = GetAgent();
+            log.Info($"Loading package {TestPackage.Name} into agent");
+            return agent.LoadPackage(TestPackage);
+        }
 
-        public RuntimeFramework RuntimeFramework { get; private set; }
+        private IAgentPackageContext GetPackageContext()
+        {
+            return _packageContext ?? (_packageContext = GetPackageLoadResult().Context);
+        }
 
-        #endregion
-
-        #region AbstractTestRunner Overrides
-
-        /// <summary>
-        /// Explore a TestPackage and return information about
-        /// the tests found.
-        /// </summary>
-        /// <param name="filter">A TestFilter used to select tests</param>
-        /// <returns>A TestEngineResult.</returns>
-        public override TestEngineResult Explore(TestFilter filter)
+        protected override TestEngineResult LoadPackage()
         {
             try
             {
-                CreateAgentAndRunner();
-                return _remoteRunner.Explore(filter);
+                UnloadPackage();
+
+                var results = GetPackageLoadResult();
+                _packageContext = results.Context;
+                return results.LoadResult;
             }
             catch (Exception e)
             {
                 log.Error("Failed to run remote tests {0}", e.Message);
-                return CreateFailedResult(e);
+                return CreateFailedResult(TestPackage, e);
             }
         }
 
-        /// <summary>
-        /// Load a TestPackage for possible execution
-        /// </summary>
-        /// <returns>A TestEngineResult.</returns>
-        protected override TestEngineResult LoadPackage()
-        {
-            log.Info("Loading " + TestPackage.Name);
-            Unload();
-
-            try
-            {
-                CreateAgentAndRunner();
-
-                return _remoteRunner.Load();
-            }
-            catch (Exception)
-            {
-                // TODO: Check if this is really needed
-                // Clean up if the load failed
-                Unload();
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Unload any loaded TestPackage and clear
-        /// the reference to the remote runner.
-        /// </summary>
         public override void UnloadPackage()
         {
             try
             {
-                if (_remoteRunner != null)
+                if (_packageContext != null)
                 {
+                    StopRun(force: true);
+
                     log.Info("Unloading " + TestPackage.Name);
-                    _remoteRunner.Unload();
-                    _remoteRunner = null;
+                    _packageContext.Dispose();
+                    _packageContext = null;
                 }
             }
-            catch (Exception e)
+            catch (Exception e) // TODO: Is this catch what we want?
             {
-                log.Warning("Failed to unload the remote runner. {0}", e.Message);
-                _remoteRunner = null;
+                log.Warning("Failed to unload the package. {0}", e.Message);
                 throw;
             }
         }
 
         /// <summary>
-        /// Count the test cases that would be run under
-        /// the specified filter.
+        /// Explore a <see cref="TestPackage"/> and return information about the tests found.
+        /// </summary>
+        /// <param name="filter">A <see cref="TestFilter"/> used to select tests.</param>
+        public override TestEngineResult Explore(TestFilter filter)
+        {
+            try
+            {
+                return GetPackageContext().Explore(filter);
+            }
+            catch (Exception e)
+            {
+                log.Error("Failed to run remote tests {0}", e.Message);
+                return CreateFailedResult(TestPackage, e);
+            }
+        }
+
+        /// <summary>
+        /// Count the test cases that would be run under the specified filter.
         /// </summary>
         /// <param name="filter">A TestFilter</param>
-        /// <returns>The count of test cases</returns>
         public override int CountTestCases(TestFilter filter)
         {
             try
             {
-                CreateAgentAndRunner();
-
-                return _remoteRunner.CountTestCases(filter);
+                return GetPackageContext().CountTestCases(filter);
             }
             catch (Exception e)
             {
@@ -147,69 +153,95 @@ namespace NUnit.Engine.Runners
         /// </summary>
         /// <param name="listener">An ITestEventHandler to receive events</param>
         /// <param name="filter">A TestFilter used to select tests</param>
-        /// <returns>A TestResult giving the result of the test execution</returns>
         protected override TestEngineResult RunTests(ITestEventListener listener, TestFilter filter)
         {
-            log.Info("Running " + TestPackage.Name);
-
             try
             {
-                CreateAgentAndRunner();
+                StopRun(force: true);
 
-                var result = _remoteRunner.Run(listener, filter);
-                log.Info("Done running " + TestPackage.Name);
-                return result;
+                log.Info("Running " + TestPackage.Name);
+
+                _runContext = GetPackageContext().StartRun(filter);
+
+                var eventHandler = listener == null ? null :
+                    new EventHandler<TestEventArgs>((sender, e) => listener.OnTestEvent(e.Report));
+
+                if (eventHandler != null) _runContext.TestEvent += eventHandler;
+                try
+                {
+                    var result = _runContext.GetResult();
+                    log.Info("Done running " + TestPackage.Name);
+                    return result;
+                }
+                finally
+                {
+                    if (eventHandler != null) _runContext.TestEvent -= eventHandler;
+                }
             }
             catch (Exception e)
             {
                 log.Error("Failed to run remote tests {0}", e.Message);
-                return CreateFailedResult(e);
+                return CreateFailedResult(TestPackage, e);
             }
         }
 
         /// <summary>
         /// Start a run of the tests in the loaded TestPackage, returning immediately.
-        /// The tests are run asynchronously and the listener interface is notified 
+        /// The tests are run asynchronously and the listener interface is notified
         /// as it progresses.
         /// </summary>
         /// <param name="listener">An ITestEventHandler to receive events</param>
         /// <param name="filter">A TestFilter used to select tests</param>
-        /// <returns>An AsyncTestRun that will provide the result of the test execution</returns>
         protected override AsyncTestEngineResult RunTestsAsync(ITestEventListener listener, TestFilter filter)
         {
-            log.Info("Running " + TestPackage.Name + " (async)");
-
             try
             {
-                CreateAgentAndRunner();
+                StopRun(force: true);
 
-                return _remoteRunner.RunAsync(listener, filter);
+                log.Info("Running " + TestPackage.Name + " (async)");
+
+                _runContext = GetPackageContext().StartRun(filter);
+
+                var eventHandler = listener == null ? null :
+                    new EventHandler<TestEventArgs>((sender, e) => listener.OnTestEvent(e.Report));
+
+                if (eventHandler != null) _runContext.TestEvent += eventHandler;
+
+                var asyncResult = new AsyncTestEngineResult();
+
+                _runContext.OnCompleted(() =>
+                {
+                    _runContext.TestEvent -= eventHandler;
+                    log.Info("Done running " + TestPackage.Name);
+                    asyncResult.SetResult(_runContext.GetResult());
+                });
+
+                return asyncResult;
             }
             catch (Exception e)
             {
                 log.Error("Failed to run remote tests {0}", e.Message);
                 var result = new AsyncTestEngineResult();
-                result.SetResult(CreateFailedResult(e));
+                result.SetResult(CreateFailedResult(TestPackage, e));
                 return result;
             }
         }
 
         /// <summary>
-        /// Cancel the ongoing test run. If no  test is running, the call is ignored.
+        /// Cancel the ongoing test run. If no test is running, the call is ignored.
         /// </summary>
         /// <param name="force">If true, cancel any ongoing test threads, otherwise wait for them to complete.</param>
         public override void StopRun(bool force)
         {
-            if (_remoteRunner != null)
+            if (_runContext == null) return;
+
+            try
             {
-                try
-                {
-                    _remoteRunner.StopRun(force);
-                }
-                catch (Exception e)
-                {
-                    log.Error("Failed to stop the remote run. {0}", e.Message);
-                }
+                _runContext.StopRun(force);
+            }
+            catch (Exception e)
+            {
+                log.Error("Failed to stop the remote run. {0}", e.Message);
             }
         }
 
@@ -240,13 +272,13 @@ namespace NUnit.Engine.Runners
                 {
                     try
                     {
-                        log.Debug("Stopping remote agent");
-                        _agent.Stop();
+                        log.Debug("Releasing remote agent back to the pool");
+                        _agent.Dispose();
                         _agent = null;
                     }
                     catch (Exception e)
                     {
-                        string stopError = string.Format("Failed to stop the remote agent. {0}", e.Message);
+                        var stopError = $"Failed to release remote agent back to the pool. {e.Message}";
                         log.Error(stopError);
                         _agent = null;
 
@@ -260,52 +292,30 @@ namespace NUnit.Engine.Runners
                 }
 
                 if (unloadError != null) // Add message line indicating we managed to stop agent anyway
-                    throw (new NUnitEngineException(unloadError + "\nAgent Process was terminated successfully after error."));
+                    throw (new NUnitEngineException(unloadError + "\nAgent was successfully released back to the pool after error."));
             }
         }
 
-#endregion
-
-#region Helper Methods
-
-        private void CreateAgentAndRunner()
-        {
-            if (_agent == null)
-            {
-                // Increase the timeout to give time to attach a debugger
-                bool debug = TestPackage.GetSetting(EnginePackageSettings.DebugAgent, false) ||
-                             TestPackage.GetSetting(EnginePackageSettings.PauseBeforeRun, false);
-
-                _agent = _agency.GetAgent(TestPackage, debug ? DEBUG_TIMEOUT : NORMAL_TIMEOUT);
-
-                if (_agent == null)
-                    throw new Exception("Unable to acquire remote process agent");
-            }
-
-            if (_remoteRunner == null)
-                _remoteRunner = _agent.CreateRunner(TestPackage);
-        }
-
-        TestEngineResult CreateFailedResult(Exception e)
+        private static TestEngineResult CreateFailedResult(TestPackage package, Exception e)
         {
             var suite = XmlHelper.CreateTopLevelElement("test-suite");
-            XmlHelper.AddAttribute(suite, "type", "Assembly");
-            XmlHelper.AddAttribute(suite, "id", TestPackage.ID);
-            XmlHelper.AddAttribute(suite, "name", TestPackage.Name);
-            XmlHelper.AddAttribute(suite, "fullname", TestPackage.FullName);
-            XmlHelper.AddAttribute(suite, "runstate", "NotRunnable");
-            XmlHelper.AddAttribute(suite, "testcasecount", "1");
-            XmlHelper.AddAttribute(suite, "result", "Failed");
-            XmlHelper.AddAttribute(suite, "label", "Error");
-            XmlHelper.AddAttribute(suite, "start-time", DateTime.UtcNow.ToString("u"));
-            XmlHelper.AddAttribute(suite, "end-time", DateTime.UtcNow.ToString("u"));
-            XmlHelper.AddAttribute(suite, "duration", "0.001");
-            XmlHelper.AddAttribute(suite, "total", "1");
-            XmlHelper.AddAttribute(suite, "passed", "0");
-            XmlHelper.AddAttribute(suite, "failed", "1");
-            XmlHelper.AddAttribute(suite, "inconclusive", "0");
-            XmlHelper.AddAttribute(suite, "skipped", "0");
-            XmlHelper.AddAttribute(suite, "asserts", "0");
+            suite.AddAttribute("type", "Assembly");
+            suite.AddAttribute("id", package.ID);
+            suite.AddAttribute("name", package.Name);
+            suite.AddAttribute("fullname", package.FullName);
+            suite.AddAttribute("runstate", "NotRunnable");
+            suite.AddAttribute("testcasecount", "1");
+            suite.AddAttribute("result", "Failed");
+            suite.AddAttribute("label", "Error");
+            suite.AddAttribute("start-time", DateTime.UtcNow.ToString("u"));
+            suite.AddAttribute("end-time", DateTime.UtcNow.ToString("u"));
+            suite.AddAttribute("duration", "0.001");
+            suite.AddAttribute("total", "1");
+            suite.AddAttribute("passed", "0");
+            suite.AddAttribute("failed", "1");
+            suite.AddAttribute("inconclusive", "0");
+            suite.AddAttribute("skipped", "0");
+            suite.AddAttribute("asserts", "0");
 
             var failure = suite.AddElement("failure");
             failure.AddElementWithCDataSection("message", e.Message);
@@ -313,7 +323,5 @@ namespace NUnit.Engine.Runners
 
             return new TestEngineResult(suite);
         }
-
-#endregion
     }
 }
