@@ -127,6 +127,10 @@
     <Compile Include="Services\AgentDataBase.cs" />
     <Compile Include="Services\ExtensionAssembly.cs" />
     <Compile Include="Services\ExtensionService.cs" />
+    <Compile Include="Internal\Metadata\CorFlags.cs" />
+    <Compile Include="Internal\Metadata\ICustomAttribute.cs" />
+    <Compile Include="Internal\Metadata\IAssemblyMetadataProvider.cs" />
+    <Compile Include="Internal\Metadata\MonoCecilAssemblyMetadataProvider.cs" />
     <Compile Include="Services\ResultWriters\NUnit3XmlResultWriter.cs" />
     <Compile Include="Services\ResultWriters\TestCaseResultWriter.cs" />
     <Compile Include="Services\ResultWriters\XmlTransformResultWriter.cs" />

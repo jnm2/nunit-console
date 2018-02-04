@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -24,9 +24,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Mono.Cecil;
+using System.Reflection;
 using NUnit.Common;
 using NUnit.Engine.Internal;
+using NUnit.Engine.Internal.Metadata;
 
 namespace NUnit.Engine.Services
 {
@@ -169,7 +170,7 @@ namespace NUnit.Engine.Services
             // We are doing two jobs here: (1) in the else clause (below)
             // we get information about a single assembly and record it,
             // (2) in the if clause, we recursively examine all subpackages
-            // and then apply policies for promulgating each setting to 
+            // and then apply policies for promulgating each setting to
             // a containing package. We could implement the policy part at
             // a higher level, but it seems simplest to do it right here.
             if (package.SubPackages.Count > 0)
@@ -182,7 +183,7 @@ namespace NUnit.Engine.Services
                     Version v = subPackage.GetSetting(InternalEnginePackageSettings.ImageRuntimeVersion, new Version(0, 0));
                     if (v > targetVersion) targetVersion = v;
 
-                    // Collect highest framework name 
+                    // Collect highest framework name
                     // TODO: This assumes lexical ordering is valid - check it
                     string fn = subPackage.GetSetting(InternalEnginePackageSettings.ImageTargetFrameworkName, "");
                     if (fn != "")
@@ -201,30 +202,26 @@ namespace NUnit.Engine.Services
             }
             else if (File.Exists(packageName) && PathUtils.IsAssemblyFileType(packageName))
             {
-                var assemblyDef = AssemblyDefinition.ReadAssembly(packageName);
-                var module = assemblyDef.MainModule;
+                IAssemblyMetadataProvider assemblyMetadataProvider = new MonoCecilAssemblyMetadataProvider(packageName);
 
-                var NativeEntryPoint = (ModuleAttributes)16;
-                var mask = ModuleAttributes.Required32Bit | NativeEntryPoint;
-
-                if (module.Architecture != TargetArchitecture.AMD64 &&
-                    module.Architecture != TargetArchitecture.IA64 &&
-                    (module.Attributes & mask) != 0)
+                if (assemblyMetadataProvider.PEMachine != ImageFileMachine.AMD64 &&
+                    assemblyMetadataProvider.PEMachine != ImageFileMachine.IA64 &&
+                    (assemblyMetadataProvider.CorFlags & (CorFlags.Requires32Bit | CorFlags.NativeEntryPoint)) != 0)
                 {
                     requiresX86 = true;
                     log.Debug("Assembly {0} will be run x86", packageName);
                 }
 
-                targetVersion = new Version(module.RuntimeVersion.Substring(1));
+                targetVersion = new Version(assemblyMetadataProvider.MetadataVersionString.Substring(1));
                 log.Debug("Assembly {0} uses version {1}", packageName, targetVersion);
 
-                foreach (var attr in assemblyDef.CustomAttributes)
+                foreach (var attr in assemblyMetadataProvider.GetCustomAttributes())
                 {
-                    if (attr.AttributeType.FullName == "System.Runtime.Versioning.TargetFrameworkAttribute")
+                    if (attr.TypeFullName == "System.Runtime.Versioning.TargetFrameworkAttribute")
                     {
-                        frameworkName = attr.ConstructorArguments[0].Value as string;
+                        frameworkName = attr.GetConstructorArguments()[0] as string;
                     }
-                    else if (attr.AttributeType.FullName == "NUnit.Framework.TestAssemblyDirectoryResolveAttribute")
+                    else if (attr.TypeFullName == "NUnit.Framework.TestAssemblyDirectoryResolveAttribute")
                     {
                         requiresAssemblyResolver = true;
                     }
@@ -232,8 +229,8 @@ namespace NUnit.Engine.Services
 
                 if (frameworkName == null)
                 {
-                    foreach (var reference in module.AssemblyReferences)
-                        if (reference.Name == "mscorlib" && BitConverter.ToUInt64(reference.PublicKeyToken, 0) == 0xac22333d05b89d96)
+                    foreach (var reference in assemblyMetadataProvider.GetAssemblyReferences())
+                        if (reference.Name == "mscorlib" && BitConverter.ToUInt64(reference.GetPublicKeyToken(), 0) == 0xac22333d05b89d96)
                         {
                             // We assume 3.5, since that's all we are supporting
                             // Could be extended to other versions if necessary
