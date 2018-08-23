@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -21,7 +21,9 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ***********************************************************************
 
-using Mono.Cecil;
+using System.IO;
+using System.Reflection;
+using NUnit.Engine.Internal.Metadata;
 
 namespace NUnit.Engine.Services
 {
@@ -36,33 +38,11 @@ namespace NUnit.Engine.Services
         public string FilePath { get; private set; }
         public bool FromWildCard { get; private set; }
 
-        private AssemblyDefinition _assemblyDefinition;
-        public AssemblyDefinition Assembly
+        private IAssemblyMetadataProvider _metadata;
+
+        internal IAssemblyMetadataProvider Metadata
         {
-            get
-            {
-                if (_assemblyDefinition == null)
-                {
-                    var resolver = new DefaultAssemblyResolver();
-                    resolver.AddSearchDirectory(System.IO.Path.GetDirectoryName(FilePath));
-                    resolver.AddSearchDirectory(System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location));
-                    var parameters = new ReaderParameters() { AssemblyResolver = resolver };
-
-                    _assemblyDefinition = AssemblyDefinition.ReadAssembly(FilePath, parameters);
-                }
-
-                return _assemblyDefinition;
-            }
-        }
-
-        public ModuleDefinition MainModule
-        {
-            get { return Assembly.MainModule; }
-        }
-
-        public AssemblyNameDefinition AssemblyName
-        {
-            get { return Assembly.Name; }
+            get => _metadata ?? (_metadata = AssemblyMetadataProvider.Create(FilePath));
         }
 
         /// <summary>
@@ -70,9 +50,9 @@ namespace NUnit.Engine.Services
         /// </summary>
         public bool IsDuplicateOf(ExtensionAssembly other)
         {
-            return AssemblyName.Name == other.AssemblyName.Name;
+            return Metadata.AssemblyName.Name == other.Metadata.AssemblyName.Name;
         }
-        
+
         /// <summary>
         /// IsBetterVersion determines whether another assembly is
         /// a better (higher) version than the current assembly.
@@ -88,8 +68,8 @@ namespace NUnit.Engine.Services
                 throw new NUnitEngineException("IsBetterVersionOf should only be called on duplicate assemblies");
 #endif
 
-            var version = AssemblyName.Version;
-            var otherVersion = other.AssemblyName.Version;
+            var version = Metadata.AssemblyName.Version;
+            var otherVersion = other.Metadata.AssemblyName.Version;
 
             if (version > otherVersion)
                 return true;
@@ -99,6 +79,12 @@ namespace NUnit.Engine.Services
 
             // Versions are equal, override only if this one was specified exactly while the other wasn't
             return !FromWildCard && other.FromWildCard;
+        }
+
+        internal string ResolveAssemblyPath(AssemblyName assemblyName)
+        {
+            return AssemblyMetadataProvider.TryResolveAssemblyPath(assemblyName.Name, Path.GetDirectoryName(FilePath))
+                ?? AssemblyMetadataProvider.TryResolveAssemblyPath(assemblyName.Name, Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location));
         }
     }
 }

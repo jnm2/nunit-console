@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -22,9 +22,7 @@
 // ***********************************************************************
 
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using NUnit.Framework;
 
 namespace NUnit.Engine.Services.Tests
@@ -39,7 +37,6 @@ namespace NUnit.Engine.Services.Tests
 
         private ExtensionAssembly _ea;
         private ExtensionAssembly _eaCopy;
-        private ExtensionAssembly _eaBetter;
         private ExtensionAssembly _eaOther;
 
         [SetUp]
@@ -47,27 +44,7 @@ namespace NUnit.Engine.Services.Tests
         {
             _ea = new ExtensionAssembly(THIS_ASSEMBLY_PATH, false);
             _eaCopy = new ExtensionAssembly(THIS_ASSEMBLY_PATH, false);
-            _eaBetter = new ExtensionAssembly(THIS_ASSEMBLY_PATH, false);
-            _eaBetter.Assembly.Name.Version = new Version(7, 0);
             _eaOther = new ExtensionAssembly(ENGINE_ASSEMBLY_PATH, false);
-        }
-
-        [Test]
-        public void AssemblyDefinition()
-        {
-            Assert.That(_ea.Assembly.FullName, Is.EqualTo(THIS_ASSEMBLY_NAME));
-        }
-
-        [Test]
-        public void MainModule()
-        {
-            Assert.That(_ea.MainModule.Assembly.FullName, Is.EqualTo(THIS_ASSEMBLY_NAME));   
-        }
-
-        [Test]
-        public void AssemblyName()
-        {
-            Assert.That(_ea.AssemblyName.FullName, Is.EqualTo(THIS_ASSEMBLY_NAME));
         }
 
         [Test]
@@ -82,13 +59,6 @@ namespace NUnit.Engine.Services.Tests
         {
             Assert.False(_ea.IsDuplicateOf(_eaOther));
             Assert.False(_eaOther.IsDuplicateOf(_ea));
-        }
-
-        [Test]
-        public void IsBetterVersionOf_DifferentVersions()
-        {
-            Assert.That(_eaBetter.IsBetterVersionOf(_ea));
-            Assert.False(_ea.IsBetterVersionOf(_eaBetter));
         }
 
         [Test]
