@@ -8,10 +8,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -22,14 +22,12 @@
 // ***********************************************************************
 
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Linq;
-using Mono.Cecil;
 using NUnit.Engine.Drivers;
 using NUnit.Engine.Extensibility;
 using NUnit.Engine.Internal;
+using NUnit.Engine.Internal.Metadata;
 
 namespace NUnit.Engine.Services
 {
@@ -57,23 +55,20 @@ namespace NUnit.Engine.Services
 
             try
             {
-                var assemblyDef = AssemblyDefinition.ReadAssembly(assemblyPath);
+                var assemblyDef = AssemblyMetadataProvider.Create(assemblyPath);
 
-                if (skipNonTestAssemblies)
+                if (skipNonTestAssemblies && assemblyDef.HasAttribute("NUnit.Framework.NonTestAssemblyAttribute"))
                 {
-                    if (assemblyDef.CustomAttributes.Any(attr => attr.AttributeType.FullName == "NUnit.Framework.NonTestAssemblyAttribute"))
-                        return new SkippedAssemblyFrameworkDriver(assemblyPath);
+                    return new SkippedAssemblyFrameworkDriver(assemblyPath);
                 }
 
-                var references = new List<AssemblyName>();
-                foreach (var cecilRef in assemblyDef.MainModule.AssemblyReferences)
-                    references.Add(new AssemblyName(cecilRef.FullName));
-
                 var factory = new NUnitNetStandardDriverFactory();
-                var driver = references.Where(reference => factory.IsSupportedTestFramework(reference))
-                                       .Select(reference => factory.GetDriver(reference))
-                                       .FirstOrDefault();
-                if(driver != null)
+                var driver = assemblyDef.AssemblyReferences
+                    .Where(factory.IsSupportedTestFramework)
+                    .Select(factory.GetDriver)
+                    .FirstOrDefault();
+
+                if (driver != null)
                 {
                     return driver;
                 }

@@ -55,6 +55,7 @@
     <Compile Include="..\nunit.engine\InternalEnginePackageSettings.cs">
       <Link>InternalEnginePackageSettings.cs</Link>
     </Compile>
+    <Compile Include="..\nunit.engine\Internal\Metadata\*.cs" LinkBase="Internal\Metadata" />
     <Compile Include="..\nunit.engine\Internal\DirectoryFinder.cs">
       <Link>Internal\DirectoryFinder.cs</Link>
     </Compile>
@@ -111,6 +112,7 @@
     <Compile Include="..\nunit.engine\TestEngineResult.cs">
       <Link>TestEngineResult.cs</Link>
     </Compile>
+    <Compile Include="..\nunit.engine\Unit.cs" />
     <Compile Include="..\nunit.engine\XmlHelper.cs">
       <Link>XmlHelper.cs</Link>
     </Compile>
@@ -152,11 +154,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.DotNet.InternalAbstractions" Version="1.0.0" />
-    <PackageReference Include="Mono.Cecil" Version="0.10.0-beta6" />
     <PackageReference Include="System.ComponentModel.EventBasedAsync" Version="4.3.0" />
     <PackageReference Include="System.ComponentModel.TypeConverter" Version="4.3.0" />
     <PackageReference Include="System.Diagnostics.Process" Version="4.3.0" />
     <PackageReference Include="System.Reflection" Version="4.3.0" />
+    <PackageReference Include="System.Reflection.Metadata" Version="1.6.0" />
     <PackageReference Include="System.Threading.Thread" Version="4.3.0" />
     <PackageReference Include="System.Xml.XmlDocument" Version="4.3.0" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="4.3.0" />

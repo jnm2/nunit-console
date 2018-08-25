@@ -170,6 +170,7 @@ Task("BuildNetFramework")
             .SetMSBuildPlatform(MSBuildPlatform.Automatic)
             .SetVerbosity(Verbosity.Minimal)
 			.SetPlatformTarget(PlatformTarget.MSIL)
+            .WithProperty("AddSyntheticProjectReferencesForSolutionDependencies", "false")
         );
     });
 

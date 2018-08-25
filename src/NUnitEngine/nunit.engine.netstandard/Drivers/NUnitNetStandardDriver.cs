@@ -27,7 +27,7 @@ using System.Collections.Generic;
 using NUnit.Engine.Internal;
 using System.Reflection;
 using NUnit.Engine.Extensibility;
-using Mono.Cecil;
+using NUnit.Engine.Internal.Metadata;
 
 namespace NUnit.Engine.Drivers
 {
@@ -74,16 +74,19 @@ namespace NUnit.Engine.Drivers
         {
             var idPrefix = string.IsNullOrEmpty(ID) ? "" : ID + "-";
 
-            var assemblyRef = AssemblyDefinition.ReadAssembly(testAssembly);
-            _testAssembly = Assembly.Load(new AssemblyName(assemblyRef.FullName));
-            if(_testAssembly == null)
-                throw new NUnitEngineException(string.Format(FAILED_TO_LOAD_TEST_ASSEMBLY, assemblyRef.FullName));
+            AssemblyName nunitRef;
+            using (var assemblyDef = AssemblyMetadataProvider.Create(testAssembly))
+            {
+                _testAssembly = Assembly.Load(assemblyDef.AssemblyName);
+                if (_testAssembly == null)
+                    throw new NUnitEngineException(string.Format(FAILED_TO_LOAD_TEST_ASSEMBLY, assemblyDef.AssemblyName.FullName));
 
-            var nunitRef = assemblyRef.MainModule.AssemblyReferences.Where(reference => reference.Name.Equals("nunit.framework", StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-            if (nunitRef == null)
-                throw new NUnitEngineException(FAILED_TO_LOAD_NUNIT);
+                nunitRef = assemblyDef.AssemblyReferences.FirstOrDefault(reference => reference.Name.Equals("nunit.framework", StringComparison.OrdinalIgnoreCase));
+                if (nunitRef == null)
+                    throw new NUnitEngineException(FAILED_TO_LOAD_NUNIT);
+            }
 
-            var nunit = Assembly.Load(new AssemblyName(nunitRef.FullName));
+            var nunit = Assembly.Load(nunitRef);
             if (nunit == null)
                 throw new NUnitEngineException(FAILED_TO_LOAD_NUNIT);
 
