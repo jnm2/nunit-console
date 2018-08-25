@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace NUnit.Engine.Internal.Metadata
 {
@@ -7,7 +6,7 @@ namespace NUnit.Engine.Internal.Metadata
     {
         public static IAssemblyMetadataProvider Create(string assemblyPath)
         {
-            throw new NotImplementedException();
+            return new DirectReflectionMetadataProvider(assemblyPath);
         }
 
         public static string TryResolveAssemblyPath(string assemblyName, string directory)
