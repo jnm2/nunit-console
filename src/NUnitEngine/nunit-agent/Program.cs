@@ -22,13 +22,13 @@
 // ***********************************************************************
 
 using System;
-using System.Configuration;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Security;
 using NUnit.Common;
 using NUnit.Engine;
-using NUnit.Engine.Agents;
 using NUnit.Engine.Internal;
 using NUnit.Engine.Services;
 
@@ -37,9 +37,7 @@ namespace NUnit.Agent
     public class NUnitTestAgent
     {
         static Guid AgentId;
-        static string AgencyUrl;
         static Process AgencyProcess;
-        static RemoteTestAgent Agent;
         private static Logger log;
 
         /// <summary>
@@ -49,7 +47,7 @@ namespace NUnit.Agent
         public static void Main(string[] args)
         {
             AgentId = new Guid(args[0]);
-            AgencyUrl = args[1];
+            var agencyEndPoint = new IPEndPoint(IPAddress.Loopback, int.Parse(args[1]));
 
             var traceLevel = InternalTraceLevel.Off;
             var pid = Process.GetCurrentProcess().Id;
@@ -112,26 +110,34 @@ namespace NUnit.Agent
             log.Info("Initializing Services");
             engine.InitializeServices();
 
-            log.Info("Starting RemoteTestAgent");
-            Agent = new RemoteTestAgent(AgentId, AgencyUrl, engine.Services);
 
-            try
+            log.Info($"Connecting to agent process at {agencyEndPoint}...");
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket.Connect(agencyEndPoint);
+
+            using (var client = new NetworkStream(socket, ownsSocket: true))
             {
-                if (Agent.Start())
-                    WaitForStop();
-                else
+                log.Info("Starting RemoteTestAgent");
+                Agent = new RemoteTestAgent(AgentId, AgencyUrl, engine.Services);
+
+                try
                 {
-                    log.Error("Failed to start RemoteTestAgent");
-                    Environment.Exit(AgentExitCodes.FAILED_TO_START_REMOTE_AGENT);
+                    if (Agent.Start())
+                        WaitForStop();
+                    else
+                    {
+                        log.Error("Failed to start RemoteTestAgent");
+                        Environment.Exit(AgentExitCodes.FAILED_TO_START_REMOTE_AGENT);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.Error("Exception in RemoteTestAgent. {0}", ExceptionHelper.BuildMessageAndStackTrace(ex));
+                    Environment.Exit(AgentExitCodes.UNEXPECTED_EXCEPTION);
                 }
             }
-            catch (Exception ex)
-            {
-                log.Error("Exception in RemoteTestAgent. {0}", ExceptionHelper.BuildMessageAndStackTrace(ex));
-                Environment.Exit(AgentExitCodes.UNEXPECTED_EXCEPTION);
-            }
-            log.Info("Agent process {0} exiting cleanly", pid);
 
+            log.Info("Agent process {0} exiting cleanly", pid);
             Environment.Exit(AgentExitCodes.OK);
         }
 

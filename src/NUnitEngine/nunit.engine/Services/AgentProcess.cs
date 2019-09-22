@@ -8,7 +8,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using NUnit.Engine;
 using NUnit.Engine.Internal;
 
 namespace NUnit.Engine.Services
@@ -17,7 +16,7 @@ namespace NUnit.Engine.Services
     {
         private static readonly Logger log = InternalTrace.GetLogger(typeof(AgentProcess));
 
-        public AgentProcess(TestAgency agency, TestPackage package, Guid agentId)
+        public AgentProcess(int serverPort, TestPackage package, Guid agentId)
         {
             // Get target runtime
             string runtimeSetting = package.GetSetting(EnginePackageSettings.RuntimeFramework, "");
@@ -31,7 +30,7 @@ namespace NUnit.Engine.Services
             bool loadUserProfile = package.GetSetting(EnginePackageSettings.LoadUserProfile, false);
             string workDirectory = package.GetSetting(EnginePackageSettings.WorkDirectory, string.Empty);
 
-            AgentArgs = new StringBuilder($"{agentId} {agency.ServerUrl} --pid={Process.GetCurrentProcess().Id}");
+            AgentArgs = new StringBuilder($"{agentId} {serverPort} --pid={Process.GetCurrentProcess().Id}");
 
             // Set options that need to be in effect before the package
             // is loaded by using the command line.

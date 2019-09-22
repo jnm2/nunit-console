@@ -22,14 +22,14 @@
 // ***********************************************************************
 
 #if !NETSTANDARD1_6 && !NETSTANDARD2_0
-using System;
-using System.IO;
-using System.Threading;
-using System.Diagnostics;
-using System.Text;
 using NUnit.Common;
-using NUnit.Engine.Agents;
+using NUnit.Engine.Communication;
+using NUnit.Engine.Communication.Model;
 using NUnit.Engine.Internal;
+using System;
+using System.Diagnostics;
+using System.Net;
+using System.Threading;
 
 namespace NUnit.Engine.Services
 {
@@ -41,15 +41,24 @@ namespace NUnit.Engine.Services
     /// but only one, ProcessAgent is implemented
     /// at this time.
     /// </summary>
-    public class TestAgency : ServerBase, ITestAgency, IService
+    public sealed class TestAgency : IAgentServer, IService
     {
         private static readonly Logger log = InternalTrace.GetLogger(typeof(TestAgency));
 
         private readonly AgentStore _agentStore = new AgentStore();
 
-        public TestAgency() : this( "TestAgency", 0 ) { }
+        /// <summary>
+        /// Use <see cref="TcpServer.ListeningOn"/> to see the actual port. If <see cref="_requestedPort"/> is <c>0</c>,
+        /// Windows assigns a random port that is known to be available.
+        /// </summary>
+        private readonly int _requestedPort;
 
-        public TestAgency( string uri, int port ) : base( uri, port ) { }
+        private TcpServer _tcpServer;
+
+        public TestAgency(int port = 0)
+        {
+            _requestedPort = port;
+        }
 
         //public override void Stop()
         //{
@@ -75,9 +84,15 @@ namespace NUnit.Engine.Services
         //    base.Stop ();
         //}
 
-        public void Register(ITestAgent agent)
+        RequestStatus IAgentServer.ConnectAsAgentWorker(ConnectAsAgentWorkerRequest request)
         {
-            _agentStore.Register(agent);
+            // Future: use request.WorkerProperties["Name"] as agent ID if present so that people can start their own
+            // agents (e.g. inside an Android emulator) and specify this stable name to run tests outside the emulator.
+
+            _agentStore.Register(new RemoteTestAgentProxy(Guid.NewGuid(), , ));
+
+            // Potentially return an error message for name conflicts.
+            return RequestStatus.Success;
         }
 
         public ITestAgent GetAgent(TestPackage package, int waitTime)
@@ -94,8 +109,8 @@ namespace NUnit.Engine.Services
         private ITestAgent CreateRemoteAgent(TestPackage package, int waitTime)
         {
             var agentId = Guid.NewGuid();
-            //var process = LaunchAgentProcess(package, agentId);
-            var process = new AgentProcess(this, package, agentId);
+
+            var process = new AgentProcess(_tcpServer.ListeningOn.Port, package, agentId);
 
             process.Exited += (sender, e) => OnAgentExit((Process)sender, agentId);
 
@@ -180,7 +195,7 @@ namespace NUnit.Engine.Services
         {
             try
             {
-                Stop();
+                _tcpServer?.Dispose();
             }
             finally
             {
@@ -190,15 +205,20 @@ namespace NUnit.Engine.Services
 
         public void StartService()
         {
+            var status = ServiceStatus.Error;
             try
             {
-                Start();
-                Status = ServiceStatus.Started;
+                var connectionHandler = new AgentServerConnectionHandler(this);
+
+                _tcpServer = TcpServer.Start(
+                    new IPEndPoint(IPAddress.Loopback, _requestedPort),
+                    connectionHandler.HandleConnection);
+
+                status = ServiceStatus.Started;
             }
-            catch
+            finally
             {
-                Status = ServiceStatus.Error;
-                throw;
+                Status = status;
             }
         }
     }
